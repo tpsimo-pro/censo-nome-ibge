@@ -7,7 +7,15 @@ type ResultComponentProps = {
   data: DataFormat[]
 }
 
-const chartSetting = {
+// Definition for type data structure in PieChart
+type PieChartData = {
+  id: number;
+  value: number;
+  label: string;
+}
+
+// Definition for type data structure in BarChart
+const BarChartData = {
   yAxis: [
     {
       label: 'Frequência',
@@ -18,14 +26,22 @@ const chartSetting = {
 }
 
 const ResultComponent = ({ data }: ResultComponentProps) => {
-  const [newData, setNewData] = useState<Record<string, any>[]>([])
+  // useState for data used in BarChart
+  const [barChartData, setBarChartData] = useState<Record<string, any>[]>([])
+  // useState for data used in PieChart
+  const [pieChartData, setPieChartData] = useState<PieChartData[]>([]);
+  // used to remove "[" present in the periodos inside res
   const cleantText = (text: string) => text.replaceAll("[", "")
+
   const handleData = useCallback(() => {
-    const periodos = new Set()
-    data.forEach(({ res }) => {
-      res.forEach(({ periodo }) => periodos.add(cleantText(periodo)))
-    })
+    // Implementation for getting data necessary to display in BarChart:
     if (data && data.length > 0) {
+      const periodos = new Set()
+      data.forEach(({ res }) => {
+        res.forEach(({ periodo }) => periodos.add(cleantText(periodo)))
+      })
+
+      // Formatting dataSet to use in BarChartComponent
       const response = Array.from(periodos).map((p) => {
         const newObject = { periodos: p }
         data.forEach(value => {
@@ -36,38 +52,70 @@ const ResultComponent = ({ data }: ResultComponentProps) => {
         })
         return newObject
       })
-      console.log(response)
-      setNewData(response)
+      setBarChartData(response)
+      console.log(data)
     }
   }, [data])
 
   useEffect(() => {
     handleData()
-  }, [handleData])
 
+    // Implementation for getting data necessary to display in PieChart: 
+    if (data && data.length > 0) {
+      const aggregatedData = data.map(item => {
+        const totalFrequencia = item.res.reduce((sum, current) => sum + current.frequencia, 0);
+        return {
+          nome: item.nome,
+          total: totalFrequencia
+        };
+      });
+
+      const topTres = aggregatedData.sort((a, b) => b.total - a.total).slice(0, 3);
+
+      // Formatting to use in PieChart Component:
+      const formatoPizza = topTres.map((item, index) => ({
+        id: index,
+        value: item.total,
+        label: `${item.nome}`,
+      }));
+      
+      setPieChartData(formatoPizza);
+    }
+  }, [handleData]) 
+  
+  // Formatting series to use in BarChart Component
   const series = useCallback(() => {
     return data.map(({ nome }) => ({ dataKey: nome, label: nome }))
-  }, [])
+  }, []) 
 
   return (
     <div>
       <h2>Resultado em Gráfico</h2>
-      {newData.length > 0 ? (<>
+      {barChartData.length > 0 ? (<>
+        <h3>Frequência por Período</h3>
         <BarChart
-          dataset={newData}
-          xAxis={[{ dataKey: 'periodos' }]}
+          dataset={barChartData}
+          xAxis={[{ scaleType: 'band', dataKey: 'periodos' }]}
           series={series()}
-        {...chartSetting}
+          {...BarChartData}
+        />
+        
+        <h3>Top 3 Nomes por Frequência Total</h3>
+        <PieChart
+          series={[
+            {
+              data: pieChartData
+            },
+          ]}
+          height={200}
+          width={200}
         />
 
-      </>): (
+      </>) : (
         <p>Digite um ou mais nomes e clique em buscar para ver o gráfico.</p>
       )}
     </div>
   )
 };
-
-
-
 
 export default ResultComponent;
